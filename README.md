@@ -1,6 +1,6 @@
 ## Project Factory Agent
 
-This is a **production-focused V1 Project Factory Agent** that creates small AI projects inside this repo under `projects/<project_name>/`, using **local Ollama** for generation, then optionally runs verification and makes multiple commits.
+This is a **production-focused V1 Project Factory Agent** that creates small AI projects under `projects/<project_name>/`, using **local Ollama** for generation, then verifies them and creates a dedicated git repository (with its own commits) for each project.
 
 Ollama is the only model backend; **no paid APIs** are used.
 
@@ -18,7 +18,7 @@ Before using the agent:
 1. Install Python dependencies (prefer `uv`, fallback to `pip`):
 
    ```bash
-   cd tools/project_factory
+   # From repo root
 
    # Using uv (recommended)
    uv venv .venv
@@ -45,9 +45,8 @@ Before using the agent:
 From this repository root (recommended):
 
 ```bash
-cd tools/project_factory
 python -m project_factory create \
-  --repo .. \
+  --repo . \
   --name my-fastapi-app \
   --goal "Simple FastAPI service with /generate backed by Ollama" \
   --template fastapi_basic \
@@ -57,7 +56,7 @@ python -m project_factory create \
 
 Arguments:
 
-- `--repo`: path to the git repository root (e.g. `..` from `tools/project_factory`)
+- `--repo`: path to the git repository root (e.g. `.` from repo root)
 - `--name`: project name; project will be created under `projects/<name>/`
 - `--goal`: natural language goal for the project
 - `--template`: template key; currently `fastapi_basic`
@@ -108,11 +107,11 @@ python -m project_factory create --repo .. --name demo --goal "Demo" --template 
      - `pytest -q`.
    - If verification **fails**, the agent prints the error and **aborts without committing**.
 
-4. **Committing**
-   - Uses `subprocess` to call `git` (no heavy wrappers).
-   - Uses `git status --porcelain` to control which files are staged.
-   - Follows the planner’s commit plan; each commit only includes files inside `projects/<name>/`.
-   - Includes a final docs-oriented commit (e.g. updated README) if applicable.
+4. **Committing (per-project repo)**
+   - Uses `subprocess` to call `git` (no heavy wrappers) **inside the generated project directory**.
+   - If `projects/<name>` is not already a git repo, it runs `git init` there.
+   - Follows the planner’s commit plan; each commit only includes files inside the project directory.
+   - The outer agent repository is not modified by these commits.
 
 5. **Safety**
    - Enforces deny patterns (never commits these if detected):
@@ -178,6 +177,6 @@ To actually create and commit a project, pass `--dry-run false`.
   - Virtualenv paths handle both `Scripts` (Windows) and `bin` (POSIX).
 - The agent only writes inside:
   - `projects/<project_name>/`
-  - `tools/project_factory/` (this tool’s own code)
-- Root-level `.pre-commit-config.yaml`, `.gitleaks.toml`, and `.gitignore` are expected to exist and are provided as part of this initial version, but the agent’s per-project commits are limited to the project folder.
+  - `project_factory/` (this tool’s own code)
+- Root-level `.pre-commit-config.yaml`, `.gitleaks.toml`, and `.gitignore` are provided as part of this initial version, but the agent’s per-project commits are limited to the project folder.
 

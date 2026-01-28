@@ -20,13 +20,19 @@ class Committer:
         """
         Perform staged commits according to plan.commits.
 
-        Each commit is restricted to files under the specific project folder.
+        Each commit is performed inside the generated project's own git
+        repository under projects/<name>/.
         """
-        repo_root = cfg.repo_root
         project_root = cfg.project_root
+        repo_root = project_root
 
         print(f"[Committer] Repo root: {repo_root}")
         print(f"[Committer] Project root: {project_root}")
+
+        # Ensure the project has its own git repo
+        if not dry_run and not (repo_root / ".git").exists():
+            print(f"[Committer] Initializing new git repository in {repo_root}")
+            self._git_init(repo_root)
 
         if dry_run:
             print("[Committer/DRY_RUN] Would execute the following commits:")
@@ -94,6 +100,17 @@ class Committer:
         if proc.returncode != 0:
             print(proc.stdout)
             raise CommitterError(f"git commit failed with exit {proc.returncode}")
+        print(proc.stdout)
+
+    @staticmethod
+    def _git_init(repo_root: Path) -> None:
+        # Basic git init; branch name follows user's global/default config.
+        cmd = ["git", "init"]
+        print(f"[Committer] git init (cwd={repo_root})")
+        proc = subprocess.run(cmd, cwd=str(repo_root), text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        if proc.returncode != 0:
+            print(proc.stdout)
+            raise CommitterError(f"git init failed with exit {proc.returncode}")
         print(proc.stdout)
 
     @staticmethod

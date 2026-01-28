@@ -74,8 +74,9 @@ class Builder:
             dest.write_text(rendered, encoding="utf8")
             print(f"[Builder] Rendered {dest}")
 
-        # Ensure per-project gitignore
+        # Ensure per-project gitignore and repo-level safety configs
         self._ensure_project_gitignore(cfg, dry_run)
+        self._ensure_project_repo_configs(cfg, dry_run)
 
         # Use Ollama to further customize README if desired
         readme_path = project_root / "README.md"
@@ -106,6 +107,77 @@ class Builder:
         else:
             cfg.project_gitignore.write_text(content, encoding="utf8")
         print(f"[Builder] Ensured .gitignore at {cfg.project_gitignore}")
+
+    def _ensure_project_repo_configs(self, cfg: CreateCommandConfig, dry_run: bool) -> None:
+        """
+        Ensure each generated project has its own pre-commit + gitleaks config
+        so that commits inside the project repo are protected.
+        """
+        project_root = cfg.project_root
+        pre_commit_path = project_root / ".pre-commit-config.yaml"
+        gitleaks_path = project_root / ".gitleaks.toml"
+
+        pre_commit_content = (
+            "repos:\n"
+            "  - repo: https://github.com/psf/black\n"
+            "    rev: 24.4.2\n"
+            "    hooks:\n"
+            "      - id: black\n"
+            "        language_version: python3\n"
+            "\n"
+            "  - repo: https://github.com/pycqa/isort\n"
+            "    rev: 5.13.2\n"
+            "    hooks:\n"
+            "      - id: isort\n"
+            "        args: [\"--profile\", \"black\"]\n"
+            "\n"
+            "  - repo: https://github.com/pre-commit/pre-commit-hooks\n"
+            "    rev: v4.6.0\n"
+            "    hooks:\n"
+            "      - id: check-yaml\n"
+            "      - id: end-of-file-fixer\n"
+            "      - id: trailing-whitespace\n"
+            "\n"
+            "  - repo: https://github.com/gitleaks/gitleaks\n"
+            "    rev: v8.18.2\n"
+            "    hooks:\n"
+            "      - id: gitleaks\n"
+            "        args: [\"protect\", \"--staged\", \"--config=.gitleaks.toml\"]\n"
+        )
+
+        gitleaks_content = (
+            "title = \"Project Factory gitleaks config\"\n"
+            "\n"
+            "[allowlist]\n"
+            "description = \"Allow some common test secrets\"\n"
+            "regexes = [\n"
+            "  '''dummysecret''',\n"
+            "  '''example_key''',\n"
+            "]\n"
+            "\n"
+            "[[rules]]\n"
+            "id = \"generic-api-key\"\n"
+            "description = \"Generic API Key\"\n"
+            "regex = '''(?i)(api[_-]?key|token)[^a-zA-Z0-9]?[\\'\\\"]?[0-9a-zA-Z\\-_=]{16,}'''\n"
+            "tags = [\"key\", \"api\", \"generic\"]\n"
+            "\n"
+            "[[rules]]\n"
+            "id = \"private-key\"\n"
+            "description = \"Private key block\"\n"
+            "regex = '''-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'''\n"
+            "tags = [\"key\", \"private\", \"pem\"]\n"
+        )
+
+        if dry_run:
+            print(f"[Builder/DRY_RUN] Would ensure .pre-commit-config.yaml and .gitleaks.toml in {project_root}")
+            return
+
+        if not pre_commit_path.exists():
+            pre_commit_path.write_text(pre_commit_content, encoding="utf8")
+            print(f"[Builder] Created {pre_commit_path}")
+        if not gitleaks_path.exists():
+            gitleaks_path.write_text(gitleaks_content, encoding="utf8")
+            print(f"[Builder] Created {gitleaks_path}")
 
     def _post_process_readme(self, cfg: CreateCommandConfig, readme_path: Path) -> None:
         """

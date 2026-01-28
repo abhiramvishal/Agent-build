@@ -1,0 +1,21 @@
+title = "Project Factory gitleaks config"
+
+[allowlist]
+description = "Allow some common test secrets"
+regexes = [
+  '''dummysecret''',
+  '''example_key''',
+]
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API Key"
+regex = '''(?i)(api[_-]?key|token)[^a-zA-Z0-9]?[\'"]?[0-9a-zA-Z\-_=]{16,}'''
+tags = ["key", "api", "generic"]
+
+[[rules]]
+id = "private-key"
+description = "Private key block"
+regex = '''-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----'''
+tags = ["key", "private", "pem"]
+
