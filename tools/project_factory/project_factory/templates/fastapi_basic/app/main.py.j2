@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+import httpx
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+
+from app.routers.health import router as health_router
+
+
+@dataclass
+class OllamaConfig:
+    base_url: str = "http://localhost:11434"
+    model: str = "{{ ollama_model }}"
+
+
+ollama_cfg = OllamaConfig()
+app = FastAPI(title="{{ project_name }}", version="0.1.0")
+app.include_router(health_router)
+
+
+@app.post("/generate")
+async def generate(payload: Dict[str, Any]) -> JSONResponse:
+    """
+    Generate text from a prompt via local Ollama.
+
+    Expected payload:
+    {
+        "prompt": "...",
+        "max_tokens": 200      # optional
+    }
+    """
+    prompt = payload.get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise HTTPException(status_code=400, detail="Field 'prompt' must be a non-empty string.")
+
+    max_tokens = payload.get("max_tokens", 200)
+    if not isinstance(max_tokens, int) or max_tokens <= 0:
+        raise HTTPException(status_code=400, detail="Field 'max_tokens' must be a positive integer.")
+
+    try:
+        text = await _ollama_generate(prompt=prompt, max_tokens=max_tokens)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Ollama call failed: {exc}") from exc
+
+    return JSONResponse({"completion": text})
+
+
+async def _ollama_generate(prompt: str, max_tokens: int) -> str:
+    """
+    Minimal async client for Ollama's /api/generate with streaming disabled.
+    """
+    url = f"{ollama_cfg.base_url.rstrip('/')}/api/generate"
+    payload: Dict[str, Any] = {
+        "model": ollama_cfg.model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "num_predict": max_tokens,
+        },
+    }
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(url, content=json.dumps(payload), headers={"Content-Type": "application/json"})
+        resp.raise_for_status()
+        data: Dict[str, Any] = resp.json()
+        text: Optional[str] = data.get("response")
+        if not isinstance(text, str):
+            raise RuntimeError(f"Unexpected Ollama response: {data!r}")
+        return text
+

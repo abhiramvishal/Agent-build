@@ -1,0 +1,24 @@
+[project]
+name = "project-factory"
+version = "0.1.0"
+description = "CLI agent to scaffold and verify AI projects inside this repo using local Ollama."
+authors = [{ name = "Project Factory Agent" }]
+readme = "README.md"
+requires-python = ">=3.10"
+
+dependencies = [
+    "jinja2>=3.1",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+]
+
+[project.scripts]
+project-factory = "project_factory.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

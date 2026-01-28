@@ -1,0 +1,8 @@
+{
+  "name": "fastapi_basic",
+  "description": "Minimal FastAPI project with /health and /generate endpoints calling local Ollama.",
+  "defaults": {
+    "python_version": "3.10"
+  }
+}
+
